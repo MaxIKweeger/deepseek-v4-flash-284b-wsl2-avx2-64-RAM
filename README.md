@@ -35,8 +35,8 @@ Sur la machine de test, le modèle complet (284B, 256 experts) se charge en ~68 
 ### 1. Installer WSL2 et lui donner la RAM (PowerShell, côté Windows)
 
 ```powershell
-git clone https://github.com/MaxIKweeger/deepseek-v4-flash-284b-wsl2-avx2.git
-cd deepseek-v4-flash-284b-wsl2-avx2
+git clone https://github.com/MaxIKweeger/deepseek-v4-flash-284b-wsl2-avx2-64-RAM.git
+cd deepseek-v4-flash-284b-wsl2-avx2-64-RAM
 powershell -ExecutionPolicy Bypass -File .\scripts\01-install-wsl.ps1 -MemoryGB 59 -SwapGB 16
 ```
 
@@ -58,7 +58,7 @@ Ouvre ensuite Ubuntu : `wsl -d Ubuntu`.
 Les scripts sont dans le dépôt cloné côté Windows, accessible depuis WSL sous `/mnt/c/...`. Le plus simple est de cloner aussi le dépôt dans WSL :
 
 ```bash
-git clone https://github.com/MaxIKweeger/deepseek-v4-flash-284b-wsl2-avx2.git ~/guide
+git clone https://github.com/MaxIKweeger/deepseek-v4-flash-284b-wsl2-avx2-64-RAM.git ~/guide
 bash ~/guide/scripts/02-download-model.sh
 ```
 
