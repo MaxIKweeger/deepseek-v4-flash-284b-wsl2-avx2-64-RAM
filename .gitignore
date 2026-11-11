@@ -1,0 +1,4 @@
+src/
+run_claude.bat
+*.gguf
+*.log
