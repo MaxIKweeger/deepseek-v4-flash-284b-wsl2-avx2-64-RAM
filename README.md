@@ -140,7 +140,8 @@ Bande passante théorique en double canal = MT/s × 8 octets × 2 : 2133 → 34 
 | llama-modchip | v2.5.0, commit `e0a005f7a150ee8b5201b22431604fd4be1e1db2` |
 | llama.cpp | commit `d2f83055d6e3b379b5d34c4837122a918cf402c2` + `patches/dsv4-64gb-cpu.patch` |
 | Modèle | `Synchopate/DeepSeek-V4-Flash-0731-Fractal-64GB-CPU-GGUF` (3 fichiers, 56,56 Gio) |
-| WSL | WSL2, Ubuntu, noyau 6.6.114.1-microsoft-standard-WSL2 |
+| WSL | WSL2, Ubuntu 26.04.1 LTS, noyau 6.6.114.1-microsoft-standard-WSL2 |
+| Compilation | gcc 15.2.0, CMake 4.2.3, Ninja |
 | OS hôte | Windows 11 Pro |
 
 ## Licences et crédits
