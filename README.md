@@ -1,38 +1,38 @@
-# DeepSeek-V4-Flash 284B sur un PC Windows sans AVX-512 (WSL2 + llama-modchip)
+# DeepSeek-V4-Flash 284B on a Windows PC without AVX-512 (WSL2 + llama-modchip)
 
-Guide reproductible pour faire tourner **DeepSeek-V4-Flash (284B paramètres, MoE) sur CPU**, avec 64 Go de RAM, sous **Windows 11 + WSL2**, sur un processeur **Intel de 10ᵉ génération (AVX2, sans AVX-512)**.
+A reproducible guide to running **DeepSeek-V4-Flash (284B parameters, MoE) on CPU**, with 64 GB of RAM, under **Windows 11 + WSL2**, on an **Intel 10th-gen processor (AVX2, no AVX-512)**.
 
-Le projet amont [`synchopate/llama-modchip`](https://github.com/synchopate/llama-modchip) fournit le moteur, le patch et le modèle, mais son binaire précompilé et ses mesures visent des CPU AVX-512 (AMD Zen 4/5). Ce dépôt documente comment l'adapter à un CPU AVX2, avec les problèmes rencontrés et les mesures réelles.
+The upstream project [`synchopate/llama-modchip`](https://github.com/synchopate/llama-modchip) provides the engine, the patch and the model, but its prebuilt binary and its benchmarks target AVX-512 CPUs (AMD Zen 4/5). This repository documents how to adapt it to an AVX2 CPU, including the problems I ran into and the measured results.
 
-> **Ce dépôt n'est pas affilié à `llama-modchip`, `llama.cpp` ni DeepSeek.** Il ne contient que de la documentation et de petits scripts. Les sources amont sont téléchargées par les scripts depuis leurs dépôts d'origine.
+> **This repository is not affiliated with `llama-modchip`, `llama.cpp` or DeepSeek.** It only contains documentation and small scripts. The scripts download the upstream sources from their original repositories.
 
-## Résultat
+## Result
 
-Sur la machine de test, le modèle complet (284B, 256 experts) se charge en ~68 s et répond correctement.
+On the test machine, the full model (284B, 256 experts) loads in ~68 s and answers correctly.
 
-| | Auteurs du projet (Zen 5) | Cette machine |
+| | Upstream authors (Zen 5) | This machine |
 |---|---|---|
-| CPU | AMD Zen 5, 16 cœurs | Intel i9-10850K, 10 cœurs / 20 threads |
-| RAM | 64 Go DDR5 | 2 × 32 Go DDR4, **2133 MT/s** (XMP désactivé) |
-| Jeu d'instructions | AVX-512 | **AVX2** (`avx avx2 fma f16c bmi2`) |
-| Traitement du prompt | 44,4 tok/s | **6,5 tok/s** |
-| Génération | 9,1 à 9,9 tok/s | **3,3 à 3,6 tok/s** |
+| CPU | AMD Zen 5, 16 cores | Intel i9-10850K, 10 cores / 20 threads |
+| RAM | 64 GB DDR5 | 2 × 32 GB DDR4, **2133 MT/s** (XMP disabled) |
+| Instruction set | AVX-512 | **AVX2** (`avx avx2 fma f16c bmi2`) |
+| Prompt processing | 44.4 tok/s | **6.5 tok/s** |
+| Generation | 9.1 to 9.9 tok/s | **3.3 to 3.6 tok/s** |
 
-- Les chiffres de la colonne « Auteurs » sont ceux publiés par le projet amont, je ne les ai pas vérifiés.
-- Les chiffres de la colonne « Cette machine » viennent de `scripts/bench.py` : un prompt de 793 tokens (6,46 tok/s en traitement, 3,29 tok/s en génération sur 64 tokens), puis une génération de 128 tokens (3,58 tok/s). Un tout premier test très court donnait 2,2 tok/s (mise en cache des pages mémoire à froid). Ce sont **deux séries de mesures seulement**, à contexte 4096, avec la configuration par défaut.
-- La génération sur CPU est limitée par la **bande passante mémoire** : la DDR4-2133 en double canal offre environ 34 Go/s contre ~90 Go/s pour de la DDR5 rapide. L'écart de génération (≈ 2,8×) est cohérent avec ce rapport (≈ 2,7×). Le GPU de la machine (RTX 4070 Ti 12 Go) n'est **pas utilisé** : les modèles Fractal-64 n'ont pas de chemin GPU.
+- The "Upstream authors" column contains the figures published by the upstream project. I have not verified them.
+- The "This machine" column comes from `scripts/bench.py`: a 793-token prompt (6.46 tok/s processing, 3.29 tok/s generation over 64 tokens), then a 128-token generation (3.58 tok/s). A very first, very short test gave 2.2 tok/s (cold memory pages). These are **only two series of measurements**, at a 4096 context, with the default configuration.
+- CPU generation is limited by **memory bandwidth**: dual-channel DDR4-2133 gives roughly 34 GB/s versus ~90 GB/s for fast DDR5. The generation gap (≈ 2.8×) is consistent with that ratio (≈ 2.7×). The machine's GPU (RTX 4070 Ti, 12 GB) is **not used**: Fractal-64 models have no GPU path.
 
-## Prérequis
+## Requirements
 
-- Windows 10/11 avec WSL2 (virtualisation activée dans le BIOS).
-- **64 Go de RAM** (le modèle fait 56,56 Gio et occupe environ 57 Gio une fois chargé ; avec 64 Go, la marge est très faible, voir [Limites](#limites-et-précautions)).
-- ~**120 Go** d'espace disque libre (modèle 57 Go + sources + compilation).
-- Un CPU x86-64 avec **AVX2** (AVX-512 non requis avec cette procédure).
-- Une connexion pour télécharger ~57 Go (environ 9 minutes sur la machine de test).
+- Windows 10/11 with WSL2 (virtualization enabled in the BIOS).
+- **64 GB of RAM** (the model is 56.56 GiB and uses about 57 GiB once loaded; with 64 GB the margin is very thin, see [Limitations](#limitations-and-precautions)).
+- ~**120 GB** of free disk space (57 GB model + sources + build).
+- An x86-64 CPU with **AVX2** (AVX-512 is not required with this procedure).
+- A connection able to download ~57 GB (about 9 minutes on the test machine).
 
-## Installation pas à pas
+## Step-by-step installation
 
-### 1. Installer WSL2 et lui donner la RAM (PowerShell, côté Windows)
+### 1. Install WSL2 and give it the RAM (PowerShell, on Windows)
 
 ```powershell
 git clone https://github.com/MaxIKweeger/deepseek-v4-flash-284b-wsl2-avx2-64-RAM.git
@@ -40,7 +40,7 @@ cd deepseek-v4-flash-284b-wsl2-avx2-64-RAM
 powershell -ExecutionPolicy Bypass -File .\scripts\01-install-wsl.ps1 -MemoryGB 59 -SwapGB 16
 ```
 
-Le script installe Ubuntu et crée `%USERPROFILE%\.wslconfig` (seulement s'il n'existe pas) :
+The script installs Ubuntu and creates `%USERPROFILE%\.wslconfig` (only if it does not already exist):
 
 ```ini
 [wsl2]
@@ -49,103 +49,104 @@ swap=16GB
 processors=10
 ```
 
-Par défaut WSL2 n'alloue que 50 % de la RAM, **insuffisant** pour ce modèle. Adapte `-MemoryGB` à environ « RAM totale − 5 Go ». Un redémarrage de Windows peut être demandé à la première installation de WSL.
+By default WSL2 only gets 50 % of the RAM, which is **not enough** for this model. Set `-MemoryGB` to roughly "total RAM − 5 GB". Windows may ask for a reboot the first time WSL is installed.
 
-Ouvre ensuite Ubuntu : `wsl -d Ubuntu`.
+Then open Ubuntu: `wsl -d Ubuntu`.
 
-### 2. Télécharger le modèle (dans WSL)
+### 2. Download the model (inside WSL)
 
-Les scripts sont dans le dépôt cloné côté Windows, accessible depuis WSL sous `/mnt/c/...`. Le plus simple est de cloner aussi le dépôt dans WSL :
+The scripts live in the repository cloned on the Windows side, reachable from WSL under `/mnt/c/...`. The simplest way is to also clone the repository inside WSL:
 
 ```bash
 git clone https://github.com/MaxIKweeger/deepseek-v4-flash-284b-wsl2-avx2-64-RAM.git ~/guide
 bash ~/guide/scripts/02-download-model.sh
 ```
 
-Le modèle vient de Hugging Face : [`Synchopate/DeepSeek-V4-Flash-0731-Fractal-64GB-CPU-GGUF`](https://huggingface.co/Synchopate/DeepSeek-V4-Flash-0731-Fractal-64GB-CPU-GGUF) (3 fichiers `.gguf`, 56,56 Gio au total) dans `~/dsv4`. Le téléchargement reprend si on relance le script.
+The model comes from Hugging Face: [`Synchopate/DeepSeek-V4-Flash-0731-Fractal-64GB-CPU-GGUF`](https://huggingface.co/Synchopate/DeepSeek-V4-Flash-0731-Fractal-64GB-CPU-GGUF) (3 `.gguf` files, 56.56 GiB in total) into `~/dsv4`. The download resumes if you rerun the script.
 
-### 3. Compiler le moteur en AVX2 (dans WSL)
+### 3. Build the engine for AVX2 (inside WSL)
 
 ```bash
 bash ~/guide/scripts/03-build-avx2.sh
 ```
 
-Le script : clone `llama-modchip` (commit `e0a005f`, version 2.5.0) et `llama.cpp` (commit `d2f83055`), supprime les fins de ligne CRLF du patch, applique `patches/dsv4-64gb-cpu.patch`, copie les fichiers RouteCrack requis, puis compile avec :
+The script clones `llama-modchip` (commit `e0a005f`, version 2.5.0) and `llama.cpp` (commit `d2f83055`), strips the CRLF line endings from the patch, applies `patches/dsv4-64gb-cpu.patch`, copies the required RouteCrack files, then builds with:
 
 ```
 -DGGML_NATIVE=ON -DGGML_AVX512=OFF -DGGML_CUDA=OFF -DLLAMA_CURL=OFF -DLLAMA_BUILD_SERVER=ON
 ```
 
-Durée : environ 5 minutes sur 10 cœurs. Le binaire est compilé avec `-march=native` : il n'est valable que pour le CPU sur lequel il a été compilé (ou équivalent).
+Duration: about 5 minutes on 10 cores. The binary is built with `-march=native`: it is only valid for the CPU it was built on (or an equivalent one).
 
-### 4. Lancer le serveur (dans WSL)
+### 4. Start the server (inside WSL)
 
 ```bash
-bash ~/guide/scripts/04-run-server.sh          # contexte 4096, threads = cœurs physiques
+bash ~/guide/scripts/04-run-server.sh          # context 4096, threads = physical cores
 ```
 
-Le chargement prend environ 1 minute. L'avertissement `failed to fit params to free device memory ... abort` est **sans conséquence** : le serveur continue et affiche `model loaded` puis `listening on http://127.0.0.1:8080`.
+Loading takes about 1 minute. The warning `failed to fit params to free device memory ... abort` is **harmless**: the server keeps going and prints `model loaded` then `listening on http://127.0.0.1:8080`.
 
-Test rapide, dans un autre terminal WSL :
+Quick test, in another WSL terminal:
 
 ```bash
 curl -s http://127.0.0.1:8080/v1/chat/completions -H 'Content-Type: application/json' \
-  -d '{"messages":[{"role":"user","content":"Dis bonjour en une phrase."}],"max_tokens":40}'
+  -d '{"messages":[{"role":"user","content":"Say hello in one sentence."}],"max_tokens":40}'
 ```
 
-Depuis Windows, l'API est aussi accessible sur `http://127.0.0.1:8080` (redirection de port automatique de WSL2). Elle est compatible OpenAI (`/v1/chat/completions`).
+From Windows, the API is also reachable at `http://127.0.0.1:8080` (WSL2 forwards the port automatically). It is OpenAI-compatible (`/v1/chat/completions`).
 
-### 5. Mesurer
+### 5. Benchmark
 
 ```bash
 python3 ~/guide/scripts/bench.py
 ```
 
-## Problèmes rencontrés et solutions
+## Problems encountered and fixes
 
-| Symptôme | Cause | Solution |
+| Symptom | Cause | Fix |
 |---|---|---|
-| `libgomp.so.1: cannot open shared object file` en lançant le binaire précompilé | Bibliothèque OpenMP absente d'Ubuntu minimal | `sudo apt-get install -y libgomp1` |
-| Le binaire précompilé `llama-server-modchip-linux-x86_64` du dépôt Hugging Face plante au chargement du modèle : `trap invalid opcode` / signal 4 (`SIGILL`) dans `dmesg` | Compilé avec des instructions **AVX-512** que le CPU n'a pas | Ne pas l'utiliser : compiler soi-même (étape 3) |
-| `git apply` : `patch does not apply` sur de nombreux fichiers alors que le commit est le bon | Le patch cloné côté Windows a des fins de ligne **CRLF** | `sed 's/\r$//' patch > patch.lf` avant `git apply` (fait par le script) |
-| Erreur de compilation : `rc_predictor.h: No such file or directory` dans `common/ngram-map.cpp` | Le patch ne contient pas les fichiers du moteur spéculatif RouteCrack | Copier `rc_predictor.h`, `rc_trie_v2.h`, `rc_stockfish.h`, `ngram-map.cpp` depuis `speculative/cpp/` du dépôt amont vers `common/` (fait par le script) |
-| `unknown tensor type 40` | Modèle Fractal-64 chargé par un `llama.cpp`/Ollama/LM Studio non patché | Utiliser uniquement le build patché de l'étape 3 |
-| Sous Git Bash, `wsl ... bash /mnt/c/...` renvoie un chemin `C:/Program Files/Git/...` | Conversion automatique des chemins | Préfixer par `MSYS_NO_PATHCONV=1` |
+| `libgomp.so.1: cannot open shared object file` when running the prebuilt binary | OpenMP library missing on a minimal Ubuntu | `sudo apt-get install -y libgomp1` |
+| The prebuilt `llama-server-modchip-linux-x86_64` from the Hugging Face repo crashes while loading the model: `trap invalid opcode` / signal 4 (`SIGILL`) in `dmesg` | Built with **AVX-512** instructions that the CPU does not have | Do not use it: build it yourself (step 3) |
+| `git apply`: `patch does not apply` on many files even though the commit is correct | The patch cloned on the Windows side has **CRLF** line endings | `sed 's/\r$//' patch > patch.lf` before `git apply` (done by the script) |
+| Build error: `rc_predictor.h: No such file or directory` in `common/ngram-map.cpp` | The patch does not include the RouteCrack speculative-engine files | Copy `rc_predictor.h`, `rc_trie_v2.h`, `rc_stockfish.h`, `ngram-map.cpp` from the upstream repo's `speculative/cpp/` into `common/` (done by the script) |
+| `unknown tensor type 40` | Fractal-64 model loaded by an unpatched `llama.cpp` / Ollama / LM Studio | Only use the patched build from step 3 |
+| In Git Bash, `wsl ... bash /mnt/c/...` returns a `C:/Program Files/Git/...` path | Automatic path conversion | Prefix the command with `MSYS_NO_PATHCONV=1` |
 
-Le lanceur Windows du projet amont (`windows/AVVIA_MODCHIP.bat`) **ne gère pas** DeepSeek-V4-Flash : il propose seulement des modèles de 8 à 30 Go avec un `llama.cpp` standard.
+The upstream project's Windows launcher (`windows/AVVIA_MODCHIP.bat`) **does not support** DeepSeek-V4-Flash: it only offers 8 to 30 GB models with a stock `llama.cpp`.
 
-## Limites et précautions
+## Limitations and precautions
 
-- **Mémoire très juste** : environ 57 Gio occupés sur 59 Go alloués à WSL. Garde le contexte petit (4096), ferme les gros programmes Windows, et surveille `free -g` dans WSL. Je n'ai pas testé de contextes longs.
-- **Vitesse** : 3 à 4 tok/s en génération et ~6,5 tok/s en traitement du prompt avec cette configuration. Un prompt de ~800 tokens prend plus de 2 minutes. Le modèle produit un raisonnement visible dans `reasoning_content` ; il peut dériver en chinois.
-- **Sécurité** : le serveur écoute sur `127.0.0.1` mais, par défaut, sans clé d'API et avec CORS ouvert (`*`). Ne l'expose pas sur le réseau sans protection.
-- **Code tiers** : le patch amont fait ~411 Ko et je ne l'ai pas audité dans le détail. Le projet amont recommande aussi un `curl ... | python3` dans certains de ses scripts, que je n'ai pas exécuté.
-- **Reproductibilité des scripts** : les étapes ont été faites une par une, à la main, sur la machine de test. Les scripts de `scripts/` en sont la version consolidée ; ils ont été vérifiés pour la syntaxe (`bash -n`) mais **pas rejoués de bout en bout depuis une machine vierge**. Si une étape échoue, ouvre une issue.
-- Les modèles/optimisations « Stockfish-PVS », `LLAMA_MOE_TOP_K=5/4` (experts élagués, plus rapide mais moins précis) ne sont pas mesurés ici.
+- **Very tight memory**: about 57 GiB used out of the 59 GB given to WSL. Keep the context small (4096), close heavy Windows programs, and watch `free -g` inside WSL. I did not test long contexts.
+- **Speed**: 3 to 4 tok/s generation and ~6.5 tok/s prompt processing with this setup. An ~800-token prompt takes more than 2 minutes. The model outputs visible reasoning in `reasoning_content`; it may drift into Chinese.
+- **Security**: the server listens on `127.0.0.1` but, by default, with no API key and open CORS (`*`). Do not expose it to the network without protection.
+- **Third-party code**: the upstream patch is ~411 KB and I did not audit it in detail. The upstream project also recommends a `curl ... | python3` in some of its scripts, which I did not run.
+- **Script reproducibility**: the steps were done one by one, by hand, on the test machine. The scripts in `scripts/` are the consolidated version; they were checked for syntax (`bash -n`) but **not replayed end to end from a clean machine**. If a step fails, please open an issue.
+- The "Stockfish-PVS" draft model and `LLAMA_MOE_TOP_K=5/4` (pruned experts, faster but less accurate) were not measured here.
+- The comments inside the scripts are written in French.
 
-## Piste pour aller plus vite : la RAM
+## Speeding things up: RAM
 
-La génération dépend de la bande passante mémoire. Si ta RAM tourne à 2133 MT/s alors qu'elle est prévue pour plus, active le profil **XMP** dans le BIOS. Vérifie d'abord la vitesse réelle :
+Generation depends on memory bandwidth. If your RAM runs at 2133 MT/s while it is rated for more, enable the **XMP** profile in the BIOS. First check the actual speed:
 
 ```powershell
 Get-CimInstance Win32_PhysicalMemory | Select PartNumber, Speed, ConfiguredClockSpeed
 ```
 
-Bande passante théorique en double canal = MT/s × 8 octets × 2 : 2133 → 34 Go/s, 2933 → 47 Go/s, 3600 → 58 Go/s. En première approximation (non mesurée), la vitesse de génération suit ce rapport.
+Theoretical dual-channel bandwidth = MT/s × 8 bytes × 2: 2133 → 34 GB/s, 2933 → 47 GB/s, 3600 → 58 GB/s. As a first approximation (not measured), generation speed follows that ratio.
 
-## Versions utilisées
+## Versions used
 
-| Composant | Version |
+| Component | Version |
 |---|---|
 | llama-modchip | v2.5.0, commit `e0a005f7a150ee8b5201b22431604fd4be1e1db2` |
 | llama.cpp | commit `d2f83055d6e3b379b5d34c4837122a918cf402c2` + `patches/dsv4-64gb-cpu.patch` |
-| Modèle | `Synchopate/DeepSeek-V4-Flash-0731-Fractal-64GB-CPU-GGUF` (3 fichiers, 56,56 Gio) |
-| WSL | WSL2, Ubuntu 26.04.1 LTS, noyau 6.6.114.1-microsoft-standard-WSL2 |
-| Compilation | gcc 15.2.0, CMake 4.2.3, Ninja |
-| OS hôte | Windows 11 Pro |
+| Model | `Synchopate/DeepSeek-V4-Flash-0731-Fractal-64GB-CPU-GGUF` (3 files, 56.56 GiB) |
+| WSL | WSL2, Ubuntu 26.04.1 LTS, kernel 6.6.114.1-microsoft-standard-WSL2 |
+| Build tools | gcc 15.2.0, CMake 4.2.3, Ninja |
+| Host OS | Windows 11 Pro |
 
-## Licences et crédits
+## Licenses and credits
 
-- [`synchopate/llama-modchip`](https://github.com/synchopate/llama-modchip) : Apache-2.0.
-- [`ggml-org/llama.cpp`](https://github.com/ggml-org/llama.cpp) : MIT.
-- Modèle : fiche Hugging Face annonçant la licence MIT, quantification par Synchopate à partir de `deepseek-ai/DeepSeek-V4-Flash-0731`.
+- [`synchopate/llama-modchip`](https://github.com/synchopate/llama-modchip): Apache-2.0.
+- [`ggml-org/llama.cpp`](https://github.com/ggml-org/llama.cpp): MIT.
+- Model: the Hugging Face model card states an MIT license; quantized by Synchopate from `deepseek-ai/DeepSeek-V4-Flash-0731`.
