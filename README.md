@@ -13,7 +13,7 @@ On the test machine, the full model (284B, 256 experts) loads in ~68 s and answe
 | | Upstream authors (Zen 5) | This machine |
 |---|---|---|
 | CPU | AMD Zen 5, 16 cores | Intel i9-10850K, 10 cores / 20 threads |
-| RAM | 64 GB DDR5 | 2 × 32 GB DDR4, **2133 MT/s** (XMP disabled) |
+| RAM | 64 GB DDR5 | 2 × 32 GB DDR4, **2133 MT/s** actual (XMP profile set to 3600 but not applied, see "Speeding things up: RAM") |
 | Instruction set | AVX-512 | **AVX2** (`avx avx2 fma f16c bmi2`) |
 | Prompt processing | 44.4 tok/s | **6.5 tok/s** |
 | Generation | 9.1 to 9.9 tok/s | **3.3 to 3.6 tok/s** |
@@ -131,6 +131,12 @@ Generation depends on memory bandwidth. If your RAM runs at 2133 MT/s while it i
 ```powershell
 Get-CimInstance Win32_PhysicalMemory | Select PartNumber, Speed, ConfiguredClockSpeed
 ```
+
+**Note:** the XMP profile can be selected (here: 3600) and the RAM may still run at 2133 MT/s. `ConfiguredClockSpeed` is what counts. On the test machine this is exactly the case: the benchmarks above were measured at 2133 MT/s even though the XMP profile was set to 3600. Typical causes:
+
+- `DRAM Frequency` forced manually to 2133 in the BIOS instead of `Auto` / 3600.
+- Fallback to JEDEC speed after a failed memory training (CMOS reset, BIOS update, failed boot). Re-apply the profile, save and reboot.
+- The i9-10850K memory controller is officially rated up to DDR4-2933, so 3600 is an overclock and may need a slightly higher `System Agent` / `VCCIO` voltage to be stable.
 
 Theoretical dual-channel bandwidth = MT/s × 8 bytes × 2: 2133 → 34 GB/s, 2933 → 47 GB/s, 3600 → 58 GB/s. As a first approximation (not measured), generation speed follows that ratio.
 
