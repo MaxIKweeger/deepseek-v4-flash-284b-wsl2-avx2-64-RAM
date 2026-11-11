@@ -13,7 +13,7 @@ On the test machine, the full model (284B, 256 experts) loads in ~68 s and answe
 | | Upstream authors (Zen 5) | This machine |
 |---|---|---|
 | CPU | AMD Zen 5, 16 cores | Intel i9-10850K, 10 cores / 20 threads |
-| RAM | 64 GB DDR5 | 2 × 32 GB DDR4, **2133 MT/s** actual (XMP profile set to 3600 but not applied, see "Speeding things up: RAM") |
+| RAM | 64 GB DDR5 | 2 × 32 GB DDR4, XMP profile set to 3600, measured frequency **2133 MT/s** (see "Speeding things up: RAM") |
 | Instruction set | AVX-512 | **AVX2** (`avx avx2 fma f16c bmi2`) |
 | Prompt processing | 44.4 tok/s | **6.5 tok/s** |
 | Generation | 9.1 to 9.9 tok/s | **3.3 to 3.6 tok/s** |
@@ -132,7 +132,7 @@ Generation depends on memory bandwidth. If your RAM runs at 2133 MT/s while it i
 Get-CimInstance Win32_PhysicalMemory | Select PartNumber, Speed, ConfiguredClockSpeed
 ```
 
-**Note:** the XMP profile can be selected (here: 3600) and the RAM may still run at 2133 MT/s. `ConfiguredClockSpeed` is what counts. On the test machine this is exactly the case: the benchmarks above were measured at 2133 MT/s even though the XMP profile was set to 3600. Typical causes:
+**Note:** the XMP profile setting and the actual frequency are two different things. `ConfiguredClockSpeed` is the actual frequency, and it is what counts. On the test machine the XMP profile is set to 3600, but Windows reports 2133 MT/s, and the benchmarks above were measured at 2133 MT/s. The cause was not identified. Possible causes:
 
 - `DRAM Frequency` forced manually to 2133 in the BIOS instead of `Auto` / 3600.
 - Fallback to JEDEC speed after a failed memory training (CMOS reset, BIOS update, failed boot). Re-apply the profile, save and reboot.
